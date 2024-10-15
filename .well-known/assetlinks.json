@@ -1,0 +1,9 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.whiteboard.kobo",
+    "sha256_cert_fingerprints":
+    ["E9:E3:39:07:B1:DF:19:51:FE:44:41:57:F8:11:40:88:D8:12:53:A3:79:67:24:95:DE:66:A9:30:57:B4:82:3D"]
+  }
+}]
