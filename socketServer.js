@@ -76,8 +76,13 @@ socket.on('undo', async () => {
   const whiteboardId = roomsArray[1];
 
   try {
+    const board = await Board.findById(whiteboardId);
+    console.log(board);
     // Find the latest drawing for the board
-    const latestDrawing = await Drawing.findOne({ board: whiteboardId }).sort({ order: -1 });
+    if (board && board.drawings.length > 0) {
+      // Get the last drawing ID from the array
+    const latestDrawingId = board.drawings[board.drawings.length - 1];
+    const latestDrawing = await Drawing.findById(latestDrawingId);
 
     if (latestDrawing) {
       // Save undo action to the undo/redo table
@@ -92,8 +97,6 @@ socket.on('undo', async () => {
         points: latestDrawing.points,
       });
       await undoAction.save();
-      const board = await Board.findById(whiteboardId);
-      console.log(board);
       board.drawings.pull({ _id: latestDrawing._id });
       const saveResult = await board.save();
       console.log('Board save result:', saveResult);
@@ -105,6 +108,7 @@ socket.on('undo', async () => {
       socket.to(whiteboardId).emit('undo');
       console.log('Undoing');
     }
+  }
   } catch (error) {
     console.error('Error handling undo event:', error);
   }
@@ -115,39 +119,44 @@ socket.on('redo', async () => {
   const whiteboardId = roomsArray[1];
 
   try {
-    // Find the latest undo action for the board
-    const latestUndoAction = await UndoAction.findOne({
-      board: whiteboardId,
-      actionType: 'undo',
-    },null,{sort:{ createdAt: -1 }});
-    console.log(latestUndoAction);
+      // Find the latest undo action for the board
+      const latestUndoAction = await UndoAction.findOne({
+          board: whiteboardId,
+          actionType: 'undo',
+      }, null, { sort: { createdAt: -1 } });
+      console.log(latestUndoAction);
 
-    if (!latestUndoAction) {
-      console.log('No undo action found for redo.');
-      return;
-    }
-    const undoneDrawing = new Drawing({
-      board: whiteboardId,
-      _id: latestUndoAction.drawing,
-      color: latestUndoAction.color,
-      brushThickness: latestUndoAction.brushThickness,
-      alpha: latestUndoAction.alpha,
-      moveTo: latestUndoAction.moveTo,
-      points: latestUndoAction.points,
-    });
+      if (!latestUndoAction) {
+          console.log('No undo action found for redo.');
+          return;
+      }
 
-    // Add the undone drawing back to the board
-    await undoneDrawing.save();
-    const board = await Board.findById(whiteboardId);
-    board.drawings.push(latestUndoAction.drawing);
-    await board.save();
-    // Broadcast the redo event to all connected clients except the sender
-    socket.to(whiteboardId).emit('redo');
-    console.log('Redoing');
+      // Create a new drawing instead of trying to reuse the ID
+      const undoneDrawing = new Drawing({
+          board: whiteboardId,
+          color: latestUndoAction.color,
+          brushThickness: latestUndoAction.brushThickness,
+          alpha: latestUndoAction.alpha,
+          moveTo: latestUndoAction.moveTo,
+          points: latestUndoAction.points,
+      });
+
+      // Save the new drawing
+      await undoneDrawing.save();
+      
+      // Add the undone drawing back to the board
+      const board = await Board.findById(whiteboardId);
+      board.drawings.push(undoneDrawing._id); // Use the new ID
+      await board.save();
+      
+      // Broadcast the redo event to all connected clients except the sender
+      socket.to(whiteboardId).emit('redo');
+      console.log('Redoing');
   } catch (error) {
-    console.error('Error handling redo event:', error);
+      console.error('Error handling redo event:', error);
   }
 });
+
 
 
   socket.on('joinChat', async (boardId) => {
